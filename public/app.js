@@ -812,7 +812,7 @@
        brightness(2.15) clips: the old order interpolated and then clipped, this one clips at
        source. Mean channel difference 0.5/255. */
     const GRADE = 'brightness(2.15) contrast(1.28) saturate(0)';
-    let film = null, filmCtx = null, filmReady = false, dirty = true;
+    let film = null, filmCtx = null, filmReady = false;
 
     function grade() {
       if (!video || video.readyState < 2) return;
@@ -824,7 +824,6 @@
       filmCtx.drawImage(video, 0, 0, vw, vh);
       filmCtx.filter = 'none';
       filmReady = true;
-      dirty = true;
     }
 
     /* Re-grade on the FILM's clock, not the display's. The loop was regrading 60 times a
@@ -853,7 +852,15 @@
       return [x0, y0, Math.min(st.w - x0, st.tw + pad * 2), Math.min(st.h - y0, (y2 + part + pad) - y0)];
     }
 
-    /* paint the glyphs of one line, returning its baseline */
+    /* Paint the glyphs of one line directly.
+       These two fillText calls are the most expensive thing in the frame, and caching them
+       into an offscreen bitmap and blitting it works — the raster comes out to within one
+       pixel in 357,000, verified. It is still not here, because it cost the canvas its
+       compositing: with the mask arriving as a canvas-to-canvas drawImage, the wordmark
+       reproducibly failed to appear in Chrome's un-clipped screenshot path even though
+       getImageData proved the right pixels were in the canvas. Correct pixels that a
+       compositor may decline to show are not worth a saving on a hero that is the whole
+       page. Kept as text. */
     function glyphs(i, y, size) {
       ctx.font = font(size);
       ctx.textAlign = 'center';
@@ -948,20 +955,24 @@
     }
 
     /* the canvas only needs a frame loop while the film is playing or the intro is running */
-    /* A canvas keeps what was last painted into it, so a frame that would redraw the same
-       picture can simply not run: the result on screen is identical. The mark changes on
-       exactly four inputs — a new film frame, the opening sequence, the hero's scroll (which
-       parts the two lines) and the pointer drift — so the loop watches those and idles
-       otherwise. With a ~25fps film on a 60Hz display that is most frames. */
-    let mraf = 0, sig = '';
+    /* This draws EVERY frame, deliberately.
+       It is tempting to skip frames whose inputs have not changed, and an earlier version of
+       this did: a canvas keeps its last painting, so the screen looks the same. But a skip is
+       only sound if the signature covers every input, and geometry is an input. A screenshot
+       or a device-metrics change can fire a resize while the canvas rect is momentarily
+       degenerate; layout() then bakes a garbage raster, and if no further change is signalled
+       the canvas holds that garbage FOREVER. Drawing unconditionally self-heals in one frame.
+       The two costly things per frame are gone regardless — the grade happens once per film
+       frame at the film's own resolution, and the glyphs are a bitmap blit rather than two
+       fillText calls at 316px — so what is left is cheap enough not to trade correctness for. */
+    let mraf = 0;
     function loop() {
       mraf = 0;
       if (!(video && video.requestVideoFrameCallback)) pollFilm();
-      const now = `${st.intro.toFixed(4)}|${chHero.cur.toFixed(4)}|${st.px.toFixed(3)}|${st.py.toFixed(3)}`;
-      if (dirty || now !== sig) { sig = now; dirty = false; draw(); }
+      draw();
       if (st.live) mraf = requestAnimationFrame(loop);
     }
-    function start() { st.live = true; dirty = true; if (!mraf) mraf = requestAnimationFrame(loop); }
+    function start() { st.live = true; if (!mraf) mraf = requestAnimationFrame(loop); }
     function stop() { st.live = false; if (mraf) cancelAnimationFrame(mraf); mraf = 0; }
 
     layout();
@@ -972,7 +983,7 @@
     }, { rootMargin: '5% 0px' }).observe(canvas);
 
     return {
-      relayout() { layout(); dirty = true; draw(); },
+      relayout() { layout(); draw(); },
       /* the GLYPH band in canvas space: cap top of line 1 to baseline of line 2. The lattice
          needs this, and it must not fall back to the canvas box, which is the whole frame. */
       band() {
@@ -1243,14 +1254,23 @@
       }
     }
 
-    let lraf = 0, llast = 0;
+    /* The field's own clock. Rasterising 118 filled-and-stroked paths across the frame is
+       ~15ms of the browser's time, and at 60Hz it was being spent to advance a conveyor that
+       travels 13 PIXELS A SECOND — a fifth of a pixel per frame. Redrawn on a fixed 33ms
+       cadence the motion is identical to the eye (the fastest thing in the field, a ripple,
+       still gets ~45 samples over its life) and the canvas simply keeps its last frame in
+       between, so nothing is dropped, only not repeated. dt is real elapsed time, so the
+       travel speed is unchanged. */
+    const LAT_STEP = 1 / 30;
+    let lraf = 0, llast = 0, lacc = 0;
     function loop(now) {
       lraf = 0;
       const dt = llast ? Math.min((now - llast) / 1000, 0.05) : 0.016;
       llast = now;
-      draw(dt);
+      lacc += dt;
+      if (lacc >= LAT_STEP) { draw(lacc); lacc = 0; }
       if (st.live) lraf = requestAnimationFrame(loop);
-      else llast = 0;
+      else { llast = 0; lacc = 0; }
     }
     function start() { if (st.live || reduce.matches) return; st.live = true; if (!lraf) lraf = requestAnimationFrame(loop); }
     function stop() { st.live = false; if (lraf) cancelAnimationFrame(lraf); lraf = 0; llast = 0; }

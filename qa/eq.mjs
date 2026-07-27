@@ -64,6 +64,7 @@ const res = await p.evaluate(async () => {
   const before = x.getImageData(0, 0, W, H).data;
 
   let maxRGB = 0, sum = 0, n = 0, over4 = 0, alphaDiff = 0, inkPx = 0;
+  let inner = 0, innerMax = 0, innerOver2 = 0;
   let lost = 0, gained = 0, bx0 = 1e9, by0 = 1e9, bx1 = -1, by1 = -1;
   for (let i = 0; i < before.length; i += 4) {
     const aA = before[i + 3], aB = after[i + 3];
@@ -78,10 +79,17 @@ const res = await p.evaluate(async () => {
       inkPx++;
       for (let q = 0; q < 3; q++) { const d = Math.abs(before[i + q] - after[i + q]); maxRGB = Math.max(maxRGB, d); sum += d; n++; if (d > 4) over4++; }
     }
+    /* interior = fully covered by type in BOTH arms, i.e. not an antialiased outline pixel */
+    if (aA > 250 && aB > 250) {
+      inner++;
+      let d = 0; for (let q = 0; q < 3; q++) d = Math.max(d, Math.abs(before[i + q] - after[i + q]));
+      innerMax = Math.max(innerMax, d); if (d > 2) innerOver2++;
+    }
   }
   return {
     W, H, inkPx, inkPct: +((inkPx / (W * H)) * 100).toFixed(1), maxRGB,
     mean: +(sum / n).toFixed(3), pctOver4: +((over4 / n) * 100).toFixed(3),
+    inner, innerMax, innerOver2,
     alphaDiff, lost, gained, box: bx1 < 0 ? null : [bx0, by0, bx1, by1],
     inkBox: (() => { const c2 = document.querySelector('[data-markc]'); return c2.dataset.ink || 'n/a'; })(),
   };
@@ -90,6 +98,7 @@ const res = await p.evaluate(async () => {
 console.log(`canvas ${res.W}x${res.H} · ink covers ${res.inkPct}% of it (${res.inkPx} px)`);
 console.log(`inside the ink:  max channel diff ${res.maxRGB}/255 · mean ${res.mean} · ${res.pctOver4}% of channels differ by >4`);
 console.log(`glyph coverage:  max alpha diff ${res.alphaDiff} · lost ${res.lost}px, gained ${res.gained}px · disagreement bbox ${JSON.stringify(res.box)}`);
+console.log(`glyph INTERIOR (${res.inner} fully-covered px): max channel diff ${res.innerMax}/255 · ${res.innerOver2} px differ by >2`);
 
 await p.evaluate(() => { const v = document.querySelector('.al-hero-video'); v.play(); });
 writeFileSync('qa/hero-after.png', await p.screenshot({ clip: { x: 0, y: 0, width: 1440, height: 900 } }));
