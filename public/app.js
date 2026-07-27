@@ -1282,13 +1282,26 @@
     });
 
     function fly() {
-      const from = lock.getBoundingClientRect();
-      const to = hdLogo?.getBoundingClientRect();
-      if (!to || !to.width) { land(); return; }
-      /* scale from the artwork's own WIDTH: same path, so this is exact */
+      /* Measure the ARTWORK on both sides, never its container. The header lockup sits in a
+         link that carries 14px of vertical padding so it clears a 44px tap target, so the
+         link's box is 28px taller than the SVG inside it: targeting the link landed the mark
+         14px high. Both sides are the same path at different widths, so comparing the two
+         <svg> boxes makes the flight exact. */
+      const fromEl = lock.querySelector('.al-lock');
+      const toEl = hdLogo?.querySelector('.al-lock');
+      if (!fromEl || !toEl) { land(); return; }
+      const from = fromEl.getBoundingClientRect();
+      const to = toEl.getBoundingClientRect();
+      if (!to.width || !from.width) { land(); return; }
+      /* scale off WIDTH, not height: height is subject to the SVG's own aspect rounding */
       const k = to.width / from.width;
+      /* the transform lands on `lock`, whose origin is 0 0, so the offset of the svg inside
+         it is carried through the scale unchanged */
+      const ox = from.left - lock.getBoundingClientRect().left;
+      const oy = from.top - lock.getBoundingClientRect().top;
       lock.style.transition = 'transform .82s cubic-bezier(.7,0,.2,1)';
-      lock.style.transform = `translate(${(to.left - from.left).toFixed(2)}px,${(to.top - from.top).toFixed(2)}px) scale(${k.toFixed(4)})`;
+      lock.style.transform = `translate(${(to.left - from.left + ox * (1 - k)).toFixed(2)}px,`
+        + `${(to.top - from.top + oy * (1 - k)).toFixed(2)}px) scale(${k.toFixed(4)})`;
       setTimeout(land, 700);
     }
 

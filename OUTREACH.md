@@ -29,13 +29,13 @@ Subject: Hugmynd að nýrri vefsíðu fyrir Öldu Music
 Góðan dag,
 
 Ég heiti Sindri Már og ég hanna vefsíður. Ég hef verið að skoða Öldu Music
-undanfarið og það sem stendur upp úr er katalógurinn sjálfur. Fimmtíu og fjórir
-listamenn á einni skrá, allt frá Elly Vilhjálms til BRÍET, og plötubúð á
-Eyjarslóð þar sem fólk getur gengið inn og haldið á tónlistinni. Það eru ekki
-mörg fyrirtæki á Íslandi sem geta sagt það.
+undanfarið og það sem stendur upp úr er allt það sem þið hafið gefið út.
+Fimmtíu og fjórir listamenn á einni skrá, allt frá Elly Vilhjálms til BRÍET, og
+plötubúð á Eyjarslóð þar sem fólk getur gengið inn og flett í plötunum. Það eru
+ekki mörg fyrirtæki á Íslandi sem geta sagt það.
 
 Þegar ég opnaði aldamusic.is sá ég hins vegar tvær myndir og tvo hlekki.
-Listafólkið og útgáfurnar eru allar til, en maður þarf að fara að leita að þeim.
+Bæði listafólkið og útgáfurnar eru þar, en maður þarf að fara að leita að þeim.
 Mér datt í hug að sýna hvernig þetta gæti litið út ef forsíðan segði söguna
 sjálf, svo ég gerði frumgerð.
 
