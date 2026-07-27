@@ -2,7 +2,7 @@
 
 **To:** alda@aldamusic.is (the only address on their site and in ja.is)
 **Status:** NOT SENT. Plain text below for manual paste.
-**Blocked on:** the preview is not deployed yet, so `[HLEKKUR Á FRUMGERÐ]` is still a
+**Blocked on:** the preview is not deployed yet, so `https://sindrimar02.github.io/aldamusic-preview/` is still a
 placeholder. Deploy first (`./deploy.sh`), confirm the live URL returns 200, paste it in.
 
 **Fact-check of the observation paragraph** (the hard rule that sank the Fisk Kompaní send):
@@ -42,7 +42,7 @@ sjálf, svo ég gerði frumgerð.
 Þetta kostar ykkur ekki neitt og því fylgir engin skuldbinding.
 
 Hana má skoða hér hvenær sem er, og hún virkar vel í síma:
-[HLEKKUR Á FRUMGERÐ]
+https://sindrimar02.github.io/aldamusic-preview/
 
 Allt á síðunni kemur úr ykkar eigin efni, myndirnar af listafólkinu og
 plötuumslögin úr netversluninni. Ef þetta er eitthvað sem þið hafið áhuga á þá
