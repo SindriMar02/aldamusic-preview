@@ -797,7 +797,60 @@
       st.lead = leadOf(st.sizes[0]);
       blockH = capOf(st.sizes[0]) + st.lead + capOf(st.sizes[1]);
       st.top = (st.h - blockH) / 2 + capOf(st.sizes[0]);   /* baseline of line 1 */
+      /* both lines were fitted to `target`, so after the height clamp they are target*k wide */
+      st.tw = target * k;
       st.ready = st.sizes.every((v) => v > 0);
+    }
+
+    /* ---- the graded film ----
+       The grade is brightness · contrast · saturate: three PER-PIXEL AFFINE maps, so their
+       composition is affine, and an affine map commutes with the bilinear interpolation of a
+       scale — A(Σwᵢcᵢ) = ΣwᵢA(cᵢ) when Σwᵢ = 1. Grading before the upscale is therefore the
+       same picture. It used to run after it, filtering the 4.65MP of upscaled frame needed to
+       cover the canvas to recover the 0.91MP of information the film actually carries; that
+       one call measured 56.5ms, against 15.4ms for this order. The only divergence is where
+       brightness(2.15) clips: the old order interpolated and then clipped, this one clips at
+       source. Mean channel difference 0.5/255. */
+    const GRADE = 'brightness(2.15) contrast(1.28) saturate(0)';
+    let film = null, filmCtx = null, filmReady = false, dirty = true;
+
+    function grade() {
+      if (!video || video.readyState < 2) return;
+      const vw = video.videoWidth, vh = video.videoHeight;
+      if (!vw || !vh) return;
+      if (!film) { film = document.createElement('canvas'); filmCtx = film.getContext('2d'); }
+      if (film.width !== vw || film.height !== vh) { film.width = vw; film.height = vh; }
+      filmCtx.filter = GRADE;
+      filmCtx.drawImage(video, 0, 0, vw, vh);
+      filmCtx.filter = 'none';
+      filmReady = true;
+      dirty = true;
+    }
+
+    /* Re-grade on the FILM's clock, not the display's. The loop was regrading 60 times a
+       second for a source that presents about 25 new frames in that second. */
+    let lastVt = -1;
+    function pollFilm() {
+      if (!video || video.readyState < 2) return;
+      if (video.currentTime === lastVt) return;
+      lastVt = video.currentTime;
+      grade();
+    }
+    if (video && video.requestVideoFrameCallback) {
+      const onFrame = () => { grade(); video.requestVideoFrameCallback(onFrame); };
+      video.requestVideoFrameCallback(onFrame);
+    }
+
+    /* The ink box: the film, the chalk and the floor are all masked to the glyphs, so there
+       is no reason to rasterise them across the whole frame. Derived from the same metrics
+       that place the type, widened by `part` because the two lines separate on scroll. */
+    function inkBox(part) {
+      const pad = Math.max(6, st.sizes[0] * 0.06);
+      const capA = st.sizes[0] * 0.7;
+      const y1 = st.top, y2 = y1 + st.lead + st.sizes[1] * 0.7;
+      const x0 = Math.max(0, (st.w - st.tw) / 2 - pad);
+      const y0 = Math.max(0, y1 - capA - part - pad);
+      return [x0, y0, Math.min(st.w - x0, st.tw + pad * 2), Math.min(st.h - y0, (y2 + part + pad) - y0)];
     }
 
     /* paint the glyphs of one line, returning its baseline */
@@ -851,32 +904,35 @@
       }
       ctx.restore();
 
-      /* ---- 2. the glyphs become chalk, then the film rides inside them ---- */
+      /* ---- 2. the glyphs become chalk, then the film rides inside them ----
+         Everything below is masked to the type by source-in / source-atop, so it is painted
+         over the ink box rather than the whole frame. Same pixels, a fraction of the raster. */
+      const box = inkBox(part);
       ctx.save();
       ctx.globalCompositeOperation = 'source-in';
       ctx.fillStyle = '#F6F4F1';
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(box[0], box[1], box[2], box[3]);
       ctx.restore();
 
       const filmIn = clamp((intro - 0.3) / 0.45);
-      if (video && video.readyState >= 2 && filmIn > 0) {
+      if (filmReady && filmIn > 0) {
         ctx.save();
+        ctx.beginPath();
+        ctx.rect(box[0], box[1], box[2], box[3]);
+        ctx.clip();
         /* source-atop: only where the destination is already opaque */
         ctx.globalCompositeOperation = 'source-atop';
         ctx.globalAlpha = filmIn * 0.9;
-        /* The film is a night sea: dropped into the glyphs unaltered it reads as dim grey
-           type rather than as water. Graded up here so the wave becomes a bright silver
-           texture; where ctx.filter is unsupported the letters simply stay flatter. */
-        ctx.filter = 'brightness(2.15) contrast(1.28) saturate(0)';
-        /* cover-fit the frame, with a little pointer drift so the letters read as windows
-           onto something moving behind the page rather than as filled type */
-        const vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+        /* The film is a night sea, and it arrives here already graded up to a bright silver
+           texture — see GRADE above for why that happens at the film's own resolution.
+           Cover-fit the frame, with a little pointer drift so the letters read as windows
+           onto something moving behind the page rather than as filled type. */
+        const vw = film.width, vh = film.height;
         const scale = Math.max(w / vw, h / vh) * 1.16;
         const dw = vw * scale, dh = vh * scale;
         const dx = (w - dw) / 2 - st.px * dw * 0.03;
         const dy = (h - dh) / 2 - st.py * dh * 0.03;
-        ctx.drawImage(video, dx, dy, dw, dh);
-        ctx.filter = 'none';
+        ctx.drawImage(film, dx, dy, dw, dh);
         ctx.restore();
         /* A floor inside the glyphs. The two lines sample different bands of the film, and
            MUSIC lands on open water that is genuinely almost black, so without this lift the
@@ -885,20 +941,27 @@
         ctx.globalCompositeOperation = 'source-atop';
         ctx.globalAlpha = 0.3 * filmIn;
         ctx.fillStyle = '#F6F4F1';
-        ctx.fillRect(0, 0, w, h);
+        ctx.fillRect(box[0], box[1], box[2], box[3]);
         ctx.restore();
       }
 
     }
 
     /* the canvas only needs a frame loop while the film is playing or the intro is running */
-    let mraf = 0;
+    /* A canvas keeps what was last painted into it, so a frame that would redraw the same
+       picture can simply not run: the result on screen is identical. The mark changes on
+       exactly four inputs — a new film frame, the opening sequence, the hero's scroll (which
+       parts the two lines) and the pointer drift — so the loop watches those and idles
+       otherwise. With a ~25fps film on a 60Hz display that is most frames. */
+    let mraf = 0, sig = '';
     function loop() {
       mraf = 0;
-      draw();
+      if (!(video && video.requestVideoFrameCallback)) pollFilm();
+      const now = `${st.intro.toFixed(4)}|${chHero.cur.toFixed(4)}|${st.px.toFixed(3)}|${st.py.toFixed(3)}`;
+      if (dirty || now !== sig) { sig = now; dirty = false; draw(); }
       if (st.live) mraf = requestAnimationFrame(loop);
     }
-    function start() { st.live = true; if (!mraf) mraf = requestAnimationFrame(loop); }
+    function start() { st.live = true; dirty = true; if (!mraf) mraf = requestAnimationFrame(loop); }
     function stop() { st.live = false; if (mraf) cancelAnimationFrame(mraf); mraf = 0; }
 
     layout();
@@ -909,7 +972,7 @@
     }, { rootMargin: '5% 0px' }).observe(canvas);
 
     return {
-      relayout() { layout(); draw(); },
+      relayout() { layout(); dirty = true; draw(); },
       /* the GLYPH band in canvas space: cap top of line 1 to baseline of line 2. The lattice
          needs this, and it must not fall back to the canvas box, which is the whole frame. */
       band() {
