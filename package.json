@@ -1,0 +1,10 @@
+{
+  "name": "aldamusic-preview",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node src/build.mjs",
+    "serve": "node server.mjs",
+    "qa": "node qa/qa.mjs"
+  }
+}

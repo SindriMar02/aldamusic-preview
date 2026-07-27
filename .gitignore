@@ -1,0 +1,13 @@
+node_modules/
+dist/
+qa/shots/
+qa/walk/
+qa/*.png
+qa/*.jpg
+qa/report.txt
+.DS_Store
+
+# The 21st.dev registry component is kept locally for provenance but NOT published: it came
+# from a paid registry behind an API key, and this repo has to be public for GitHub Pages.
+# vendor/README.md stays, and records exactly which mechanism was reimplemented.
+src/vendor/mechanical-waves.tsx

@@ -1,0 +1,10 @@
+import puppeteer from 'puppeteer-core';
+const b = await puppeteer.launch({ executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless:true, userDataDir:'/private/tmp/claude-501/alda-qa-profile' });
+const p = await b.newPage();
+await p.setViewport({width:1440,height:900});
+p.on('pageerror', e => console.log('PAGEERROR:', e.message, '\nSTACK:', e.stack));
+await p.goto('http://localhost:8811/', { waitUntil:'networkidle0' });
+await new Promise(r=>setTimeout(r,600));
+await p.evaluate(()=>window.scrollTo(0,3000));
+await new Promise(r=>setTimeout(r,600));
+await b.close();
