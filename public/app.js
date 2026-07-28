@@ -486,46 +486,74 @@
        with it. src is stashed first, because a lazy plate that never loaded has nowhere else
        to get it from. */
     let warmSpan = 1;
-    plates.forEach((p) => {
-      const img = p.querySelector('img');
-      if (img) img.dataset.src = img.getAttribute('src') || '';
+    /* resolved once: the roll advances about once per frame during a fling, so anything
+       per-plate in here runs at frame rate. An earlier version of this walked all 54 plates
+       with a querySelector each time the active artist changed, which was 32 selector
+       lookups a frame — the window is small, so only the window should be touched. */
+    const plateImg = plates.map((p) => p.querySelector('img'));
+    const held = new Set();
+    plates.forEach((p, k) => {
+      const img = plateImg[k];
+      if (img) {
+        img.dataset.src = img.getAttribute('src') || '';
+        if (img.getAttribute('src')) held.add(k);
+      }
       /* an archive plate paints the SAME photo twice: once contained as the <img>, and once
          behind it as the out-of-focus wash on ::before. Releasing only the <img> would leave
          half the roll's bitmap retained through the custom property. */
       const bg = p.style.getPropertyValue('--al-bg');
       if (bg) p.dataset.bg = bg;
     });
+
     function warm(i) {
       /* one past the leading edge: the roll only ever advances one artist at a time */
       const lo = Math.max(0, i - warmSpan), hi = Math.min(n - 1, i + warmSpan + 1);
-      for (let k = 0; k < n; k++) {
+      for (let k = lo; k <= hi; k++) {
+        if (held.has(k)) continue;
+        const img = plateImg[k]; if (!img) continue;
+        if (img.dataset.src) img.setAttribute('src', img.dataset.src);
+        if (img.loading === 'lazy') { img.loading = 'eager'; img.decode?.().catch(() => {}); }
         const p = plates[k];
-        const img = p?.querySelector('img');
-        if (!img) continue;
-        if (k >= lo && k <= hi) {
-          if (!img.getAttribute('src') && img.dataset.src) img.setAttribute('src', img.dataset.src);
-          if (img.loading === 'lazy') { img.loading = 'eager'; img.decode?.().catch(() => {}); }
-          if (p.dataset.bg && p.style.getPropertyValue('--al-bg') !== p.dataset.bg) {
-            p.style.setProperty('--al-bg', p.dataset.bg);
-          }
-        } else if (k !== cur) {
-          /* only ever drop a plate that is not the one on screen */
-          if (img.getAttribute('src')) img.removeAttribute('src');
-          if (p.dataset.bg && p.style.getPropertyValue('--al-bg') !== 'none') {
-            p.style.setProperty('--al-bg', 'none');
-          }
-        }
+        if (p.dataset.bg) p.style.setProperty('--al-bg', p.dataset.bg);
+        held.add(k);
+      }
+      /* and give back everything outside it, walking only what is actually held */
+      for (const k of held) {
+        if (k >= lo && k <= hi) continue;
+        if (k === cur) continue;              /* never drop the plate on screen */
+        const img = plateImg[k]; if (!img) continue;
+        img.removeAttribute('src');
+        const p = plates[k];
+        if (p.dataset.bg) p.style.setProperty('--al-bg', 'none');
+        held.delete(k);
       }
     }
 
+    /* Only the handful of elements whose state actually changes gets touched.
+       This used to walk all 54 plates and all 54 rows on every artist change, setting or
+       removing data-on and data-near on each — 162 attribute writes, and during a fling the
+       roll advances about once a frame, so that ran at frame rate. Every one of those writes
+       invalidates that element's style whether or not the value moved, and the recalc was
+       ~800 elements a pass, a fifth of the document, every frame. Advancing by one artist
+       genuinely changes six elements. */
     function select(i) {
       if (i === cur) return;
+      const prev = cur;
       cur = i;
-      plates.forEach((p, k) => (k === i ? p.setAttribute('data-on', '1') : p.removeAttribute('data-on')));
-      rows.forEach((r, k) => {
-        if (k === i) r.setAttribute('data-on', '1'); else r.removeAttribute('data-on');
-        if (Math.abs(k - i) === 1) r.setAttribute('data-near', '1'); else r.removeAttribute('data-near');
-      });
+      if (prev >= 0) {
+        plates[prev]?.removeAttribute('data-on');
+        rows[prev]?.removeAttribute('data-on');
+        rows[prev - 1]?.removeAttribute('data-near');
+        rows[prev + 1]?.removeAttribute('data-near');
+      } else {
+        /* first selection: clear whatever the markup shipped with */
+        plates.forEach((p, k) => { if (k !== i) p.removeAttribute('data-on'); });
+        rows.forEach((r) => { r.removeAttribute('data-on'); r.removeAttribute('data-near'); });
+      }
+      plates[i]?.setAttribute('data-on', '1');
+      rows[i]?.setAttribute('data-on', '1');
+      rows[i - 1]?.setAttribute('data-near', '1');
+      rows[i + 1]?.setAttribute('data-near', '1');
       numEl.textContent = String(i + 1).padStart(2, '0');
       scramble(nameEl, names[i]);
       wave?.reseed(names[i]);
@@ -1538,6 +1566,11 @@
   function measureBoxes() {
     measureReveals();
     measureSplits();
+    /* the write-guards above cache the last value written to each element. A re-measure moves
+       the geometry under them, and an element whose inline style was cleared by anything else
+       would never be written again, so the caches die with the boxes that produced them. */
+    revealed.forEach((r) => { r.rv = undefined; });
+    splits.forEach((s) => { s.railV = null; });
     panelBoxes = panels.map((el) => ({ el, top: absTop(el), h: el.offsetHeight }));
     shopBox = shopEl ? { top: absTop(shopEl), h: shopEl.offsetHeight } : null;
     histBox = histEl ? { top: absTop(histEl), h: histEl.offsetHeight } : null;
@@ -1581,10 +1614,20 @@
         if (hd.dataset.theme !== theme) hd.dataset.theme = theme;
       }
 
+      /* Every write below is guarded by "would this actually change anything".
+         53 reveal elements, 5 panels and the rails were being written on every scroll frame
+         whether or not their value had moved, and a custom-property write invalidates that
+         element's style whatever it is set to. At any scroll position nearly all of them are
+         pinned at 0 or 1, outside their own window: 47 writes a frame, of which a handful
+         mattered. Skipping a write that would set the identical value is invisible by
+         construction — unlike skipping a whole redraw, there is no hidden input, because the
+         comparison IS the value being written. Caches are cleared in measureBoxes(), so a
+         relayout cannot leave a stale one behind. */
       const start = vh * 0.94, end = vh * 0.42;
       for (const r of revealed) {
         const top = r.top - y;
-        r.el.style.setProperty('--rv', clamp((start - top) / Math.max(1, start - end)).toFixed(4));
+        const v = Math.round(clamp((start - top) / Math.max(1, start - end)) * 1e4) / 1e4;
+        if (v !== r.rv) { r.rv = v; r.el.style.setProperty('--rv', v.toFixed(4)); }
       }
 
       for (const r of ruleBoxes) {
@@ -1606,10 +1649,17 @@
         if (!s.rails) continue;
         const p = clamp((vh * 0.9 - (s.top - y)) / (vh * 0.62));
         const n = s.rows.length;
-        s.rows.forEach((row, ri) => {
-          const rail = row.querySelector('.al-row-rail > i');
-          if (rail) rail.style.transform = `scaleX(${clamp(p * n - ri).toFixed(4)})`;
-        });
+        /* the rail elements were being looked up by selector per row PER FRAME. They are
+           rebuilt only by buildSplits(), which makes new split objects, so this cannot go
+           stale. */
+        if (!s.railEls) s.railEls = s.rows.map((row) => row.querySelector('.al-row-rail > i'));
+        if (!s.railV) s.railV = new Array(n).fill(-1);
+        for (let ri = 0; ri < n; ri++) {
+          const rail = s.railEls[ri];
+          if (!rail) continue;
+          const v = Math.round(clamp(p * n - ri) * 1e4) / 1e4;
+          if (v !== s.railV[ri]) { s.railV[ri] = v; rail.style.transform = `scaleX(${v.toFixed(4)})`; }
+        }
       }
 
       /* 5. THE STACK. Sections used to hard-cut into one another. Now the panel being
@@ -1620,24 +1670,24 @@
          scroll position, so the whole thing is reversible. */
       for (const p of panelBoxes) {
         const top = p.top - y;
-        const exit = clamp((-top) / (p.h * 0.55 + vh * 0.5));
-        const enter = clamp((top - vh * 0.1) / (vh * 0.7));
-        p.el.style.setProperty('--al-exit', exit.toFixed(4));
-        p.el.style.setProperty('--al-enter', enter.toFixed(4));
+        const exit = Math.round(clamp((-top) / (p.h * 0.55 + vh * 0.5)) * 1e4) / 1e4;
+        const enter = Math.round(clamp((top - vh * 0.1) / (vh * 0.7)) * 1e4) / 1e4;
+        if (exit !== p.exit) { p.exit = exit; p.el.style.setProperty('--al-exit', exit.toFixed(4)); }
+        if (enter !== p.enter) { p.enter = enter; p.el.style.setProperty('--al-enter', enter.toFixed(4)); }
       }
 
       /* 6. the release cards ride their own depth: each one lags a little more than its
          neighbour as the rail passes, so the row has thickness instead of being a flat strip */
       if (shopBox) {
-        const pass = clamp((y + vh - shopBox.top) / (shopBox.h + vh)) * 2 - 1;
-        shopEl.style.setProperty('--al-cardp', pass.toFixed(4));
+        const pass = Math.round((clamp((y + vh - shopBox.top) / (shopBox.h + vh)) * 2 - 1) * 1e4) / 1e4;
+        if (pass !== shopBox.cardp) { shopBox.cardp = pass; shopEl.style.setProperty('--al-cardp', pass.toFixed(4)); }
       }
 
       /* 4. scrubbed travel and rotation over each element's full pass through the
          viewport (their "top bottom" → "bottom top" window) */
       if (shopBox) {
-        const pass = clamp((y + vh - shopBox.top) / (shopBox.h + vh));
-        shopEl.style.setProperty('--al-spin', `${(pass * 660).toFixed(2)}deg`);
+        const spin = Math.round(clamp((y + vh - shopBox.top) / (shopBox.h + vh)) * 660 * 100) / 100;
+        if (spin !== shopBox.spin) { shopBox.spin = spin; shopEl.style.setProperty('--al-spin', `${spin.toFixed(2)}deg`); }
       }
 
 

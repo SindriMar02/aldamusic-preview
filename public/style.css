@@ -861,6 +861,19 @@ a { color: inherit; }
 }
 
 /* ---------- scrubbed reveals ---------- */
+/* --rv is read only by the element it is set on, so it is declared NON-INHERITING.
+   Custom properties inherit by default, and that is the expensive part: writing --rv on a
+   reveal container told the style engine that every descendant might depend on it, so all of
+   them were recomputed. These containers hold the split headings, hundreds of per-character
+   spans, so ~800 elements were recalculated on every scroll frame -- a fifth of the document,
+   and the largest single cost on a phone. Declared this way the write invalidates one
+   element. Nothing else reads --rv, so nothing loses a value it was using. */
+@property --rv {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
 [data-rv] {
   --rv: 0;
   opacity: calc(.08 + var(--rv) * .92);
@@ -1091,8 +1104,45 @@ a { color: inherit; }
 .al-rel-link:hover .al-rel-disc-i,
 .al-rel-link:focus-visible .al-rel-disc-i { animation: none; }
 
+/* Phones reveal by the LINE, not by the letter.
+   The per-character stagger is the effect on a wide screen, but its cost is one independently
+   transitioning element per character: 341 of them, each with transition-delay
+   calc(var(--i) * 17ms), so a heading keeps hundreds of elements in flight for close to six
+   seconds and every one of them needs a style recalc on every frame of it. Measured at ~700
+   elements recalculated per pass during a scroll, which was 45% of the frame and the single
+   largest cost on mobile. The row already has the padded mask that protects Í Á Ó Ú Ý, so
+   moving the reveal up one level is the same motion with 21 animated elements instead of 341.
+   The stylesheet already makes this argument for body copy a few rules up -- 300 staggered
+   characters read as noise at 15px -- and at 390px wide that is true of the headings too. */
+@media (max-width: 700px) {
+  .al-row-i {
+    display: block;
+    transform: translateY(102%) rotate(1.2deg);
+    opacity: 0;
+    transition:
+      transform .74s cubic-bezier(.16, 1, .3, 1),
+      opacity .5s linear;
+  }
+  .is-in .al-row-i { transform: none; opacity: 1; }
+  /* the characters stop being animated things and become plain text inside the moving line */
+  .al-ch,
+  .al-lead .al-ch,
+  .al-parent-b .al-ch {
+    transform: none;
+    opacity: 1;
+    transition: none;
+  }
+  /* keep the line-to-line cascade: the rows stagger instead of the letters */
+  .al-row:nth-child(2) .al-row-i { transition-delay: .07s; }
+  .al-row:nth-child(3) .al-row-i { transition-delay: .14s; }
+  .al-row:nth-child(4) .al-row-i { transition-delay: .21s; }
+  .al-row:nth-child(5) .al-row-i { transition-delay: .28s; }
+  .al-row:nth-child(n+6) .al-row-i { transition-delay: .35s; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .al-ch { transform: none !important; opacity: 1 !important; transition: none !important; }
+  .al-row-i { transform: none !important; opacity: 1 !important; transition: none !important; }
   .al-row-rail > i { transform: scaleX(1); }
   .al-odo { height: auto !important; }
   .al-odo-strip { transform: none !important; }
