@@ -476,11 +476,45 @@
     /* Portraits are 1800px because they render full-bleed; that makes the eager set the
        whole page-weight question. One is eager, its immediate neighbours warm on first
        paint, and the window widens only once the section is actually being read. */
+    /* And the window is a WINDOW, in both directions. Lazy loading bounds what is fetched,
+       not what is retained: reading to the end of the roll decoded all 54 portraits and
+       nothing ever gave them back, 271MB of bitmap on a phone, which is a tab kill and a
+       reload rather than a slow page. A portrait at 1800px is 13MB decoded and it is 1800px
+       for a reason -- full-bleed cover on a 390px phone displays it at 844x844, so at dpr2 it
+       genuinely wants ~1700px and a smaller source visibly softens it. So the fix is to hold
+       FEW, not to hold small: plates outside the window give their src back and the decode
+       with it. src is stashed first, because a lazy plate that never loaded has nowhere else
+       to get it from. */
     let warmSpan = 1;
+    plates.forEach((p) => {
+      const img = p.querySelector('img');
+      if (img) img.dataset.src = img.getAttribute('src') || '';
+      /* an archive plate paints the SAME photo twice: once contained as the <img>, and once
+         behind it as the out-of-focus wash on ::before. Releasing only the <img> would leave
+         half the roll's bitmap retained through the custom property. */
+      const bg = p.style.getPropertyValue('--al-bg');
+      if (bg) p.dataset.bg = bg;
+    });
     function warm(i) {
-      for (let k = Math.max(0, i - warmSpan); k <= Math.min(n - 1, i + warmSpan + 1); k++) {
-        const img = plates[k]?.querySelector('img');
-        if (img && img.loading === 'lazy') { img.loading = 'eager'; img.decode?.().catch(() => {}); }
+      /* one past the leading edge: the roll only ever advances one artist at a time */
+      const lo = Math.max(0, i - warmSpan), hi = Math.min(n - 1, i + warmSpan + 1);
+      for (let k = 0; k < n; k++) {
+        const p = plates[k];
+        const img = p?.querySelector('img');
+        if (!img) continue;
+        if (k >= lo && k <= hi) {
+          if (!img.getAttribute('src') && img.dataset.src) img.setAttribute('src', img.dataset.src);
+          if (img.loading === 'lazy') { img.loading = 'eager'; img.decode?.().catch(() => {}); }
+          if (p.dataset.bg && p.style.getPropertyValue('--al-bg') !== p.dataset.bg) {
+            p.style.setProperty('--al-bg', p.dataset.bg);
+          }
+        } else if (k !== cur) {
+          /* only ever drop a plate that is not the one on screen */
+          if (img.getAttribute('src')) img.removeAttribute('src');
+          if (p.dataset.bg && p.style.getPropertyValue('--al-bg') !== 'none') {
+            p.style.setProperty('--al-bg', 'none');
+          }
+        }
       }
     }
 
