@@ -16,6 +16,10 @@ const b = await puppeteer.launch({
 });
 const p = await b.newPage();
 await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+/* These profiles are reused across runs, and app.js ships unfingerprinted with a 10-minute
+   max-age, so a live check will happily re-measure the PREVIOUS deploy and report no change.
+   That happened. Never trust a live number from a warm cache. */
+await p.setCacheEnabled(false);
 const cdp = await p.target().createCDPSession();
 await p.goto(URL, { waitUntil: 'load', timeout: 60000 });
 await new Promise((r) => setTimeout(r, 4500));
