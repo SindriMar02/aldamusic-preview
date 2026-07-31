@@ -478,8 +478,17 @@
     });
 
     let row = 56, travel = 0, cur = -1;
-    /* same reason as the rail: this section holds 54 rows and 54 plates */
-    const chRoll = chan(0.13, (v) => { list.style.transform = `translate3d(0,${-v.toFixed(2)}px,0)`; });
+    /* Same reason as the rail: this section holds 54 rows and 54 plates.
+
+       The time constant is HALVED for touch, and that is the whole of the "the artists lag"
+       complaint. The section holds a steady ~53fps on a throttled phone, identical to every
+       other section on the page, so nothing here is dropping frames — what it was doing was
+       trailing the finger by 122ms and then coasting for another 500ms after the finger
+       stopped. A mouse wheel arrives in discrete notches and damping is what makes it feel
+       continuous; a finger IS continuous, and content that does not track it reads as lag no
+       matter how smooth it is. Desktop keeps the full .13 for the wheel. */
+    const touch = matchMedia('(hover: none) and (pointer: coarse)').matches;
+    const chRoll = chan(touch ? 0.06 : 0.13, (v) => { list.style.transform = `translate3d(0,${-v.toFixed(2)}px,0)`; });
 
     function measure() {
       row = rows[0]?.offsetHeight || 56;
