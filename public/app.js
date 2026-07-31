@@ -492,10 +492,19 @@
 
     function measure() {
       row = rows[0]?.offsetHeight || 56;
-      /* scroll cost per artist, decoupled from row height: 54 rows at full row height made
-         this one section 4.9 viewports tall */
+      /* Scroll cost per artist, decoupled from row height: 54 rows at full row height made
+         this one section 4.9 viewports tall.
+
+         Touch gets 90px rather than 40. At 40 an ordinary 900px flick moved the roster past
+         23 of the 54 artists, so no portrait was ever on screen long enough to be looked at
+         — the section read as frantic, which is easy to mistake for the page being slow. It
+         was not: the roll holds the same ~53fps as every other section. 90px puts a flick at
+         about 10 artists. The cost is length, and it is the real tradeoff here: the section
+         goes from 2120px of scroll to roughly 4770px.
+         Desktop stays at 48 deliberately — a wheel is a different instrument and that value
+         has not been measured the way this one has. */
       travel = row * (n - 1);
-      const perArtist = innerWidth >= 1024 ? 48 : 40;
+      const perArtist = innerWidth >= 1024 ? 48 : 90;
       spacer.style.setProperty('--al-roll-travel', `${perArtist * (n - 1)}px`);
     }
 
