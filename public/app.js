@@ -488,23 +488,32 @@
        continuous; a finger IS continuous, and content that does not track it reads as lag no
        matter how smooth it is. Desktop keeps the full .13 for the wheel. */
     const touch = matchMedia('(hover: none) and (pointer: coarse)').matches;
-    const chRoll = chan(touch ? 0.06 : 0.13, (v) => { list.style.transform = `translate3d(0,${-v.toFixed(2)}px,0)`; });
+    /* Touch gets no damping worth the name. .004 is well under one frame, so the roster
+       lands on the scroll position the same frame it arrives — the finger IS the animation.
+       Halving .13 to .06 was not enough and could not have been: any tau at all means the
+       content is somewhere the finger is not. The wheel keeps .13, where damping is the
+       thing that turns discrete notches into motion. */
+    const chRoll = chan(touch ? 0.004 : 0.13, (v) => { list.style.transform = `translate3d(0,${-v.toFixed(2)}px,0)`; });
 
     function measure() {
       row = rows[0]?.offsetHeight || 56;
-      /* Scroll cost per artist, decoupled from row height: 54 rows at full row height made
-         this one section 4.9 viewports tall.
+      /* ONE PIXEL OF ROSTER PER PIXEL OF SCROLL. perArtist is the row height, so `travel`
+         and the spacer's travel are the same number and the list moves exactly as far as the
+         page does.
 
-         Touch gets 90px rather than 40. At 40 an ordinary 900px flick moved the roster past
-         23 of the 54 artists, so no portrait was ever on screen long enough to be looked at
-         — the section read as frantic, which is easy to mistake for the page being slow. It
-         was not: the roll holds the same ~53fps as every other section. 90px puts a flick at
-         about 10 artists. The cost is length, and it is the real tradeoff here: the section
-         goes from 2120px of scroll to roughly 4770px.
-         Desktop stays at 48 deliberately — a wheel is a different instrument and that value
-         has not been measured the way this one has. */
+         This is the thing the reference gets right and this section had wrong. Measured on
+         rcarecords.com: nothing is pinned, and NOTHING moves at a ratio other than 1.00 — the
+         roster is just a list that scrolls. houseofyellow.nl does pin a wrapper, but the only
+         elements it transforms move at 0.03x-0.06x, decorative offsets riding on top of a
+         native 1:1 scroll. Neither of them drags the main content along at some other rate.
+
+         This roster was at 1.15x, and I made it 0.51x by giving each artist 90px against a
+         46px row -- content moving at half the speed of the finger, which is the definition
+         of heavy. It read as MORE lag, correctly. Dwell time is not worth buying with the
+         feeling that the page is resisting you: at 1.00x the artists go past quickly, and
+         that is simply what a list does when you flick it. */
       travel = row * (n - 1);
-      const perArtist = innerWidth >= 1024 ? 48 : 90;
+      const perArtist = row;
       spacer.style.setProperty('--al-roll-travel', `${perArtist * (n - 1)}px`);
     }
 
