@@ -5,6 +5,11 @@ qa/walk/
 qa/*.png
 qa/*.jpg
 qa/report.txt
+# harness OUTPUT, regenerated on every run: pixel-diff pairs, plate captures
+qa/diff-*/
+qa/plate-*/
+# throwaway one-question probes, kept out of the repo on purpose
+qa/_*.mjs
 .DS_Store
 
 # The 21st.dev registry component is kept locally for provenance but NOT published: it came

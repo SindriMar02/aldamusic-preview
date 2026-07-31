@@ -44,10 +44,29 @@
   }
   function wake() { if (!raf) raf = requestAnimationFrame(frame); }
 
-  /* ---------------- page channels ---------------- */
-  const chPage = chan(0.12, (v) => doc.style.setProperty('--al-p', v.toFixed(4)));
-  const chVel = chan(0.12, (v) => doc.style.setProperty('--al-vel', v.toFixed(4)));
-  const chRule = chan(0.18, (v) => doc.style.setProperty('--al-rule', v.toFixed(4)));
+  /* ---------------- page channels ----------------
+     NOTHING here writes to the root element any more, and that single fact is most of this
+     page's scroll cost.
+
+     A custom property that is not registered with `@property` INHERITS. Setting one on
+     <html> therefore dirties the inherited-style chain of the entire document, so all three
+     of these writes — sixty times a second, for the whole length of a scroll — were forcing
+     Blink to recalculate 931 of the page's 1352 elements per pass. Suppressing just these
+     three took a pass from 931 elements to 118, a 87% cut, measured over three interleaved
+     runs (qa/split-recalc.mjs). Suppressing every transition and every animation on the page
+     instead changed nothing at all: +5%.
+
+     Two of the three were writing to no one. `--al-p` and `--al-vel` were never read by a
+     single CSS declaration — only `chPage.cur` and `chVel.cur` are read, from JS, so the
+     channels stay and the property writes go. `--al-rule` has exactly one consumer, the
+     shop rules, so it is written on them. */
+  const chPage = chan(0.12, () => {});
+  const chVel = chan(0.12, () => {});
+  let ruleEls = [];
+  const chRule = chan(0.18, (v) => {
+    const s = v.toFixed(4);
+    for (const el of ruleEls) el.style.setProperty('--al-rule', s);
+  });
 
   /* The hero curtain. Tight tau (.085) so the parting feels attached to the finger, while
      media and content sit on slower channels: the depth ordering of the time constants is
@@ -589,18 +608,20 @@
     /* Idle ripple: after a few quiet seconds a dim wave runs down the names. Same purpose
        as the reference's idle animation, done with one custom property per row so it costs
        nothing per frame. */
-    let idleT = 0, rippleT = 0, rippling = false;
-    function poke() {
+    let idleT = 0, rippleT = 0, rippling = false, seen = true;
+    function idleStop() {
       clearTimeout(idleT); clearTimeout(rippleT);
       /* This runs on every scroll frame. Clearing 54 inline properties each time cost 37
          long tasks and dropped the sweep to 45fps; the reset only has to happen when a
          ripple is actually on. */
-      if (rippling) {
-        rippling = false;
-        root.removeAttribute('data-idle');
-        rows.forEach((r) => r.style.removeProperty('--dim'));
-      }
-      if (reduce.matches) return;
+      if (!rippling) return;
+      rippling = false;
+      root.removeAttribute('data-idle');
+      rows.forEach((r) => r.style.removeProperty('--dim'));
+    }
+    function poke() {
+      idleStop();
+      if (reduce.matches || !seen) return;
       idleT = setTimeout(ripple, 3800);
     }
     function ripple() {
@@ -612,6 +633,21 @@
       });
       rippleT = setTimeout(ripple, rows.length * 26 + 2600);
     }
+
+    /* The ripple re-armed itself forever. Its whole job is to tell someone LOOKING at the
+       column that the column is alive, and it was doing that from the moment the page loaded
+       until the tab closed — 108 timers and up to 54 concurrent opacity transitions every four
+       seconds while the reader was at the hero, or the footer, or making coffee. Every one of
+       those transitions is a style recalc per frame on a list of 54 large text-shadowed rows.
+       It costs nothing to run it only when the roster is on screen, which is the only time it
+       means anything. */
+    new IntersectionObserver((es) => {
+      es.forEach((e) => {
+        seen = e.isIntersecting;
+        if (seen) poke();
+        else idleStop();
+      });
+    }).observe(root);
 
     function update(top, height, vh) {
       if (warmSpan === 1 && top < vh) { warmSpan = 3; warm(cur < 0 ? 0 : cur); }
@@ -897,9 +933,28 @@
       lastVt = video.currentTime;
       grade();
     }
-    if (video && video.requestVideoFrameCallback) {
-      const onFrame = () => { grade(); video.requestVideoFrameCallback(onFrame); };
-      video.requestVideoFrameCallback(onFrame);
+    /* The film is WORK, and it was running for the whole session.
+       This callback used to re-arm itself unconditionally, so a 1280x714 video kept decoding
+       and kept being blitted through a filter twenty times a second while the hero was ten
+       screens away and its canvas was not even being drawn. On a phone that is a GPU->CPU
+       texture readback per frame that never lets up: the thing that makes the tab hot, and
+       then makes it die. Both the decode and the grade now belong to the canvas's own
+       visibility, exactly like the draw loop. */
+    let vfc = 0;
+    function onFrame() {
+      vfc = 0;
+      grade();
+      if (st.live && video.requestVideoFrameCallback) vfc = video.requestVideoFrameCallback(onFrame);
+    }
+    function filmStart() {
+      if (!video || reduce.matches) return;
+      if (video.paused) video.play().catch(() => {});
+      if (video.requestVideoFrameCallback && !vfc) vfc = video.requestVideoFrameCallback(onFrame);
+    }
+    function filmStop() {
+      if (!video) return;
+      if (vfc && video.cancelVideoFrameCallback) { video.cancelVideoFrameCallback(vfc); vfc = 0; }
+      if (!video.paused) video.pause();
     }
 
     /* The ink box: the film, the chalk and the floor are all masked to the glyphs, so there
@@ -1024,9 +1079,9 @@
        or a device-metrics change can fire a resize while the canvas rect is momentarily
        degenerate; layout() then bakes a garbage raster, and if no further change is signalled
        the canvas holds that garbage FOREVER. Drawing unconditionally self-heals in one frame.
-       The two costly things per frame are gone regardless — the grade happens once per film
-       frame at the film's own resolution, and the glyphs are a bitmap blit rather than two
-       fillText calls at 316px — so what is left is cheap enough not to trade correctness for. */
+       The expensive part is gone regardless: the grade happens once per film frame, at the
+       film's own resolution, only while the hero is on screen. What is left is two fillText
+       calls in a clipped box, which is cheap enough not to trade correctness for. */
     let mraf = 0;
     function loop() {
       mraf = 0;
@@ -1034,8 +1089,8 @@
       draw();
       if (st.live) mraf = requestAnimationFrame(loop);
     }
-    function start() { st.live = true; if (!mraf) mraf = requestAnimationFrame(loop); }
-    function stop() { st.live = false; if (mraf) cancelAnimationFrame(mraf); mraf = 0; }
+    function start() { st.live = true; filmStart(); if (!mraf) mraf = requestAnimationFrame(loop); }
+    function stop() { st.live = false; filmStop(); if (mraf) cancelAnimationFrame(mraf); mraf = 0; }
 
     layout();
     draw();
@@ -1508,6 +1563,23 @@
   /* ---------------- boot ---------------- */
   markReveals();
 
+  /* `animation: … infinite` means infinite, including the hours it spends off screen.
+     The scroll cue, the ticker and the drag hint each kept the animation timeline hot for the
+     whole session: a style-recalc mark every frame per animated element, and a compositor that
+     never gets to go quiet. They are cheap individually and permanent collectively, which is
+     the profile of the thing that flattens a phone battery. Pause them when they are not
+     being looked at; the browser keeps the animation's position, so nothing restarts. */
+  const paced = [...document.querySelectorAll('.al-hero-scroll-r, .al-tk-track, .al-rail-hint')];
+  if (paced.length && !reduce.matches) {
+    const pacer = new IntersectionObserver((es) => {
+      es.forEach((e) => {
+        if (e.isIntersecting) e.target.removeAttribute('data-anim');
+        else e.target.setAttribute('data-anim', 'off');
+      });
+    }, { rootMargin: '10% 0px' });
+    paced.forEach((el) => pacer.observe(el));
+  }
+
   /* backgrounded tabs pause video-only autoplay; poke it and fall back to the poster */
   const film = document.querySelector('.al-hero-video');
   if (film && !reduce.matches) { film.muted = true; film.play().catch(() => {}); }
@@ -1554,7 +1626,12 @@
 
   /* one scroll pass, zero layout reads: every position is cached here and refreshed on
      resize / fonts-ready / load */
-  const ruleEls = [...document.querySelectorAll('.al-shop .al-rule')];
+  /* The shop rule's position DRIVES the channel; every rule on the page RECEIVES it. Those
+     were the same list back when the value lived on the root and simply inherited everywhere
+     — the footer rule was riding on the shop rule's inheritance. Writing per element makes
+     the distinction load-bearing, so it is spelled out. */
+  const ruleDrivers = [...document.querySelectorAll('.al-shop .al-rule')];
+  ruleEls = [...document.querySelectorAll('.al-rule')];
   const bandEls = [...document.querySelectorAll('[data-theme]')];
   let ruleBoxes = [], bandBoxes = [], rollBox = null, shopBox = null, histBox = null;
   /* every full-width band takes part in the stack choreography */
@@ -1574,7 +1651,7 @@
     panelBoxes = panels.map((el) => ({ el, top: absTop(el), h: el.offsetHeight }));
     shopBox = shopEl ? { top: absTop(shopEl), h: shopEl.offsetHeight } : null;
     histBox = histEl ? { top: absTop(histEl), h: histEl.offsetHeight } : null;
-    ruleBoxes = ruleEls.map((el) => ({ top: absTop(el), h: el.offsetHeight }));
+    ruleBoxes = ruleDrivers.map((el) => ({ top: absTop(el), h: el.offsetHeight }));
     bandBoxes = bandEls.map((el) => ({ top: absTop(el), h: el.offsetHeight, theme: el.dataset.theme }));
     rollBox = roll ? { top: absTop(roll.spacer), h: roll.spacer.offsetHeight } : null;
   }

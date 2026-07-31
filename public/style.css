@@ -53,9 +53,10 @@
   --ease: cubic-bezier(.22, .68, 0, 1);
   --ease-o: cubic-bezier(.16, 1, .3, 1);
 
-  /* engine channels, all written from app.js */
-  --al-p: 0;
-  --al-vel: 0;
+  /* engine channels, all written from app.js. --al-p and --al-vel used to live here too;
+     they were set on the root every scroll frame and read by no declaration anywhere, which
+     on an UNREGISTERED custom property means dirtying the whole document's inherited style
+     for nothing. Their channels still exist, they are just read from JS now. */
   --al-roll-y: 0;
   --al-tl: 0;
 }
@@ -416,6 +417,15 @@ a { color: inherit; }
 }
 @keyframes al-ticker { to { transform: translate3d(-50%, 0, 0); } }
 
+/* an endless animation nobody can see is pure tax; app.js flips this off screen. Paused is
+   not stopped — the animation holds its position, so scrolling back resumes mid-stride.
+   `!important` earns its place here: every one of these animations is declared with the
+   `animation:` SHORTHAND, which re-sets animation-play-state to running. At equal specificity
+   this rule then wins or loses on source order alone, and it silently lost for the drag hint,
+   which is declared further down. An override that must beat any shorthand anywhere says so. */
+[data-anim='off'],
+[data-anim='off'] span::after { animation-play-state: paused !important; }
+
 /* ---------- marquee band ---------- */
 .al-mq {
   position: relative;
@@ -567,10 +577,19 @@ a { color: inherit; }
   opacity: 0;
   transform: scale(1.045);
   transition: opacity .42s var(--ease), transform .9s var(--ease-o);
-  will-change: opacity;
 }
 .al-plate[data-on='1'] { opacity: 1; transform: none; z-index: 1; }
-.al-plate:not([data-on='1']) { content-visibility: hidden; }
+/* No `will-change: opacity`, and no `content-visibility: hidden`, both measured out:
+   `will-change` promoted all 54 plates permanently. A promoted full-bleed plate is a
+   1170x2532 backing store at dpr3 — 11.8MB of GPU memory each — and it bought nothing the
+   browser does not already do for the ~400ms a plate is actually transitioning. It also
+   carried 25% of every recalculated element in a fling (241,727 vs 322,872 over three
+   interleaved runs).
+   `content-visibility` was worse: 14,000 "added to / removed from layout" records per
+   two-second fling, 74% of ALL style invalidation on the page, and it DOUBLED layout time
+   (70ms against 32ms) rather than saving it. It was there to stop 54 full-bleed portraits
+   painting; since warm() strips `src` from every plate outside the read window there is no
+   longer anything in them to paint. */
 .al-plate img {
   width: 100%; height: 100%;
   object-fit: cover;

@@ -6,5 +6,9 @@
     "build": "node src/build.mjs",
     "serve": "node server.mjs",
     "qa": "node qa/qa.mjs"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^24.0.0"
   }
 }
