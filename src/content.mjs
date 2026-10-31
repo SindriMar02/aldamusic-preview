@@ -3,9 +3,9 @@ export { ARTISTS, RELEASES } from './roster.mjs';
 export const META = {
   name: 'Alda Music',
   domain: 'aldamusic.is',
-  title: 'Alda Music · íslensk tónlist frá 1975',
+  title: 'Alda Music · íslensk tónlist',
   description:
-    'Alda Music gefur út og heldur til haga stórum hluta þess sem hefur verið hljóðritað á Íslandi. '
+    'Alda Music gefur út íslenska tónlist. '
     + '53 listamenn, plötubúð á Eyjarslóð 7 og netverslun.',
   address: 'Eyjarslóð 7, 101 Reykjavík',
   email: 'alda@aldamusic.is',
@@ -41,10 +41,9 @@ export const HERO = {
   /* Two lines so the wordmark can sit as one solid word and one hollow word, the way a
      label stamp reads. Not split per character: Icelandic accents need the whole line. */
   markLines: ['ALDA', 'MUSIC'],
-  eyebrow: 'Reykjavík · síðan 1975',
+  eyebrow: 'Reykjavík · síðan 2016',
   lead:
-    'Við gefum út íslenska tónlist og höldum til haga stórum hluta þess sem hefur verið '
-    + 'hljóðritað hér. Frá Skífunni til Öldu, á plötu og í streymi.',
+    'Við gefum út íslenska tónlist, á plötu og í streymi. Frá Skífunni til Öldu.',
   scroll: 'Skruna',
   play: 'Hlusta',
   tickerLabel: 'Nýtt á plötu',
@@ -73,7 +72,7 @@ export const HISTORY = {
   eyebrow: 'Aldamót',
   title: 'Frá Skífunni til Öldu',
   lead:
-    'Sama fyrirtæki, fjögur nöfn og fimmtíu ár. Dragðu tímalínuna til hliðar.',
+    'Frá plötubúð í Hafnarfirði 1975 til Öldu í dag. Dragðu tímalínuna til hliðar.',
   drag: 'Dragðu tímalínuna',
   items: [
     {
@@ -105,16 +104,15 @@ export const HISTORY = {
       head: 'Universal',
       tag: 'Alþjóðleg dreifing',
       body:
-        'Universal Music Group kaupir Öldu fyrir um 1,7 milljarða króna. Sölvi heldur áfram '
-        + 'með hópnum og íslenski katalógurinn fer inn í stærsta dreifikerfi heims.',
+        'Ingrooves, sem er hluti af Universal Music Group, kaupir Öldu. Sölvi heldur áfram '
+        + 'með hópnum og íslenski katalógurinn fær alþjóðlega dreifingu.',
     },
     {
       year: 'Núna',
       head: 'Eyjarslóð 7',
       tag: 'Reykjavík 101',
       body:
-        'Fimmtíu og þrír listamenn á skrá, plötubúð opin sex daga vikunnar og netverslun '
-        + 'sem sendir hvert sem er. Sama katalógur, fimmtíu árum síðar.',
+        'Fimmtíu og þrír listamenn á skrá, plötubúð opin sex daga vikunnar og netverslun.',
     },
   ],
 };
