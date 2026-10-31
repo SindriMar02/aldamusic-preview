@@ -27,7 +27,7 @@ const waveRule = () => `
 
 const sleeve = (r, i) => `
 <article class="al-rel" data-rel="${i}" style="--n:${i % 8}">
-  <a class="al-rel-link" href="${esc(r.url)}" target="_blank" rel="noopener">
+  <a class="al-rel-link" href="${esc(r.url)}" target="_blank" rel="noopener" style="--cover:url(img/shop/${esc(r.slug)}.webp)">
     <span class="al-rel-frame">
       <span class="al-rel-disc" aria-hidden="true"><span class="al-rel-disc-i"></span></span>
       <img class="al-rel-img" src="img/shop/${esc(r.slug)}.webp" width="${r.w}" height="${r.h}"
@@ -150,24 +150,14 @@ ${noindex ? '<meta name="robots" content="noindex, nofollow">' : ''}
 
   <section class="al-hero" data-hero data-theme="dark" aria-labelledby="al-h1">
     <div class="al-hero-frame">
-      <!-- the film: a generated North Atlantic wave, monochrome, looped. The one asset on
-           this page that is not the client's own; it is the brand word made literal. -->
-      <div class="al-hero-film" aria-hidden="true">
-        <video class="al-hero-video" muted loop playsinline autoplay
-               poster="img/brand/wave-poster.webp" preload="metadata">
-          <source src="img/brand/wave-loop.mp4" type="video/mp4">
-        </video>
-      </div>
-
       <p class="al-hero-eye">${esc(HERO.eyebrow)}</p>
 
-      <!-- the lattice: mechanical waves travelling through a membrane of wires, above the
-           film and below the letters -->
+      <!-- the lattice: mechanical waves travelling through a membrane of wires, under the
+           letters; the pointer seeds short waves where it is -->
       <canvas class="al-lattice" data-lattice aria-hidden="true"></canvas>
 
-      <!-- The name is a window: the film plays INSIDE the letters and nowhere else. Drawn
-           in canvas rather than with mix-blend-mode, because a blend over a hardware
-           composited <video> is silently ignored on WebKit. The h1 stays in the DOM as the
+      <!-- The name is a window: a wall of the label's own sleeves moves INSIDE the letters and
+           nowhere else. Drawn in canvas so the mask is exact on every engine. The h1 stays in the DOM as the
            real heading; the canvas is the picture of it. -->
       <div class="al-hero-stage">
         <h1 class="al-sr" id="al-h1">${esc(META.name)}</h1>

@@ -128,11 +128,15 @@ a { color: inherit; }
   font-family: var(--dsp);
   font-weight: 500;
   font-size: clamp(78px, 15.5vw, 260px);
-  line-height: .82;
+  /* .98, not .82: Í Á Ö carry their mark ~.22em above the cap line, and at .82 the gap
+     between two lines was .12em, so the accent of one line ran into the feet of the line
+     above it. The gap has to be larger than the accent. */
+  line-height: .98;
   letter-spacing: -.005em;
   text-transform: uppercase;
   color: var(--ink);
 }
+.al-eye + .al-h2 { margin-top: clamp(22px, 2.6vw, 44px); }
 .al-h2--dark { color: var(--chalk); font-size: clamp(52px, 7.6vw, 124px); }
 .al-lead {
   margin: clamp(18px, 2vw, 30px) 0 0;
@@ -480,7 +484,7 @@ a { color: inherit; }
 
 .al-rel-frame {
   position: relative; display: block;
-  aspect-ratio: 1; overflow: hidden;
+  aspect-ratio: 1;
   background: var(--paper-2);
 }
 .al-rel-img {
@@ -489,31 +493,55 @@ a { color: inherit; }
   object-fit: cover;
   max-width: none;
   transform: translate3d(0, 0, 0) scale(1.001);
-  transition: transform .8s var(--ease-o), filter .6s var(--ease);
+  transition: transform 0.62s linear(0.0, 0.0318, 0.1097, 0.2124, 0.3251, 0.4373, 0.5427, 0.6375, 0.7197, 0.7891, 0.8462, 0.8919, 0.9276, 0.9548, 0.975, 0.9894, 0.9993, 1.0056, 1.0094, 1.0112, 1.0118, 1.0114, 1.0105, 1.0093, 1.008, 1.0066, 1.0054, 1.0043, 1), filter .6s var(--ease);
   filter: saturate(.92);
 }
-/* the vinyl slides out from behind the sleeve and turns, which is what a record does */
+/* The vinyl, after 21st.dev's Vinyl Album Card (@saurabh-2607, Great UI, MIT): a full-size
+   record behind the sleeve. On hover the record leaves to the right and turns half a turn
+   on a soft spring, while the jacket answers on a tighter one (rotate -4deg, scale .98,
+   x -7%). Both springs are the component's own (80/15 and 150/20) sampled into linear().
+   Grooves are the component's eleven rings; the label carries the sleeve's own art, with a
+   spindle hole; the sheen is its cyan / pink / yellow, as a conic wash instead of
+   mix-blend-mode so a rail of twenty records is not twenty blend layers. */
 .al-rel-disc {
   position: absolute; top: 50%; left: 50%;
-  width: 86%; aspect-ratio: 1;
-  transform: translate(-50%, -50%) translateX(0);
-  transition: transform .85s var(--ease-o);
+  width: 100%; aspect-ratio: 1;
+  transform: translate(-50%, -50%) translateX(0) rotate(0deg);
+  transition: transform 0.83s linear(0.0, 0.0236, 0.0827, 0.1635, 0.2552, 0.3504, 0.4437, 0.5316, 0.6119, 0.6836, 0.7462, 0.7998, 0.8451, 0.8826, 0.9133, 0.9379, 0.9574, 0.9724, 0.9839, 0.9923, 0.9984, 1.0026, 1.0054, 1.007, 1.0078, 1.0079, 1.0077, 1.0072, 1.0066, 1.0058, 1.0051, 1.0043, 1);
   z-index: 0;
 }
 .al-rel-disc-i {
   position: absolute; inset: 0; border-radius: 50%;
+  border: 1px solid #262626;
   background:
-    radial-gradient(circle at 50% 50%, var(--paper) 0 5.6%, #0E0E10 5.6% 8.4%, transparent 8.4%),
-    repeating-radial-gradient(circle at 50% 50%, #16161A 0 1.5px, #0B0B0D 1.5px 3px),
+    conic-gradient(from 45deg, rgba(34,211,238,.26), rgba(244,114,182,.26), rgba(250,204,21,.26),
+      rgba(34,211,238,.26) 50%, rgba(244,114,182,.26) 75%, rgba(34,211,238,.26)),
+    conic-gradient(from 20deg, rgba(255,255,255,.14) 0 8%, transparent 8% 50%, rgba(255,255,255,.14) 50% 58%, transparent 58%),
+    repeating-radial-gradient(circle closest-side at 50% 50%, #0B0B0D 0 1.9%, rgba(255,255,255,.2) 1.9% 2.2%, #0B0B0D 2.2% 2.78%),
     #0B0B0D;
   animation: al-spin 2.6s linear infinite paused;
 }
+.al-rel-disc-i::before {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 33.3%; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--cover, #F6F4F1) center / cover no-repeat;
+  box-shadow: inset 0 0 0 2px rgba(0,0,0,.2);
+}
+.al-rel-disc-i::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  width: 4.2%; aspect-ratio: 1; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: #0f0f0f;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.5);
+}
 .al-rel-link:hover .al-rel-disc,
-.al-rel-link:focus-visible .al-rel-disc { transform: translate(-50%, -50%) translateX(46%); }
+.al-rel-link:focus-visible .al-rel-disc { transform: translate(-50%, -50%) translateX(48.6%) rotate(180deg); }
+.al-rel:hover { z-index: 3; }
 .al-rel-link:hover .al-rel-disc-i,
 .al-rel-link:focus-visible .al-rel-disc-i { animation-play-state: running; }
 .al-rel-link:hover .al-rel-img,
-.al-rel-link:focus-visible .al-rel-img { transform: scale(1.03); filter: saturate(1.04); }
+.al-rel-link:focus-visible .al-rel-img { transform: translate3d(-7%, 0, 0) rotate(-4deg) scale(.98); filter: saturate(1.04); }
 @keyframes al-spin { to { transform: rotate(360deg); } }
 
 .al-rel-meta {
@@ -779,7 +807,7 @@ a { color: inherit; }
   margin: 0 auto;
   max-width: 22ch;
   font-family: var(--dsp); font-weight: 500;
-  font-size: clamp(52px, 8.6vw, 148px); line-height: .86;
+  font-size: clamp(52px, 8.6vw, 148px); line-height: .98;
   text-transform: uppercase; color: var(--chalk);
 }
 .al-parent-h > span { display: block; padding-top: .1em; }
@@ -805,7 +833,7 @@ a { color: inherit; }
 .al-cta-h {
   margin: 0; max-width: 24ch;
   font-family: var(--dsp); font-weight: 500;
-  font-size: clamp(60px, 10vw, 176px); line-height: .84;
+  font-size: clamp(60px, 10vw, 176px); line-height: .98;
   text-transform: uppercase;
 }
 .al-cta-h > span { display: block; padding-top: .1em; }
@@ -1061,8 +1089,8 @@ a { color: inherit; }
   display: block;
   position: relative;
   overflow: hidden;
-  padding-top: .2em;
-  margin-top: -.2em;
+  padding-top: .3em;
+  margin-top: -.3em;
 }
 .al-row-i { display: block; }
 

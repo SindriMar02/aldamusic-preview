@@ -868,13 +868,13 @@
     return { update, measure, get index() { return index; } };
   }
 
-  /* ---------------- the wordmark: a window onto the film ---------------- */
-  /* ALDA / MUSIC is painted into a canvas, and the wave is composited INSIDE the glyphs
-     with source-in. Two reasons it is canvas and not CSS: background-clip: text cannot
-     take a <video>, and a mix-blend-mode over a hardware-composited video is silently
-     ignored on WebKit (that one has bitten this project before). Canvas is deterministic
-     on every engine and lets the opening sequence drive the reveal per pixel. */
-  function makeMark(canvas, video) {
+  /* ---------------- the wordmark: a window onto the sleeves ---------------- */
+  /* ALDA / MUSIC is painted into a canvas, and a drifting wall of the label's own album
+     covers is composited INSIDE the glyphs with source-atop, so the name is filled with every
+     colour the catalogue carries and the page behind it stays plain ink. Canvas and not CSS
+     because the opening sequence drives the reveal per pixel and because the mask must be
+     deterministic on every engine (mix-blend-mode over composited layers is not). */
+  function makeMark(canvas, coverSrcs) {
     if (!canvas) return null;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
@@ -927,62 +927,21 @@
       st.ready = st.sizes.every((v) => v > 0);
     }
 
-    /* ---- the graded film ----
-       The grade is brightness · contrast · saturate: three PER-PIXEL AFFINE maps, so their
-       composition is affine, and an affine map commutes with the bilinear interpolation of a
-       scale — A(Σwᵢcᵢ) = ΣwᵢA(cᵢ) when Σwᵢ = 1. Grading before the upscale is therefore the
-       same picture. It used to run after it, filtering the 4.65MP of upscaled frame needed to
-       cover the canvas to recover the 0.91MP of information the film actually carries; that
-       one call measured 56.5ms, against 15.4ms for this order. The only divergence is where
-       brightness(2.15) clips: the old order interpolated and then clipped, this one clips at
-       source. Mean channel difference 0.5/255. */
-    const GRADE = 'brightness(2.15) contrast(1.28) saturate(0)';
-    let film = null, filmCtx = null, filmReady = false;
-
-    function grade() {
-      if (!video || video.readyState < 2) return;
-      const vw = video.videoWidth, vh = video.videoHeight;
-      if (!vw || !vh) return;
-      if (!film) { film = document.createElement('canvas'); filmCtx = film.getContext('2d'); }
-      if (film.width !== vw || film.height !== vh) { film.width = vw; film.height = vh; }
-      filmCtx.filter = GRADE;
-      filmCtx.drawImage(video, 0, 0, vw, vh);
-      filmCtx.filter = 'none';
-      filmReady = true;
-    }
-
-    /* Re-grade on the FILM's clock, not the display's. The loop was regrading 60 times a
-       second for a source that presents about 25 new frames in that second. */
-    let lastVt = -1;
-    function pollFilm() {
-      if (!video || video.readyState < 2) return;
-      if (video.currentTime === lastVt) return;
-      lastVt = video.currentTime;
-      grade();
-    }
-    /* The film is WORK, and it was running for the whole session.
-       This callback used to re-arm itself unconditionally, so a 1280x714 video kept decoding
-       and kept being blitted through a filter twenty times a second while the hero was ten
-       screens away and its canvas was not even being drawn. On a phone that is a GPU->CPU
-       texture readback per frame that never lets up: the thing that makes the tab hot, and
-       then makes it die. Both the decode and the grade now belong to the canvas's own
-       visibility, exactly like the draw loop. */
-    let vfc = 0;
-    function onFrame() {
-      vfc = 0;
-      grade();
-      if (st.live && video.requestVideoFrameCallback) vfc = video.requestVideoFrameCallback(onFrame);
-    }
-    function filmStart() {
-      if (!video || reduce.matches) return;
-      if (video.paused) video.play().catch(() => {});
-      if (video.requestVideoFrameCallback && !vfc) vfc = video.requestVideoFrameCallback(onFrame);
-    }
-    function filmStop() {
-      if (!video) return;
-      if (vfc && video.cancelVideoFrameCallback) { video.cancelVideoFrameCallback(vfc); vfc = 0; }
-      if (!video.paused) video.pause();
-    }
+    /* ---- the wall of sleeves ----
+       Two rows of covers, each a conveyor, running in opposite directions at different
+       speeds so the colour inside the letters never lines up twice. A cover is a square the
+       size of half a cap height: a stroke of a letter shows a piece of one record and the
+       next stroke shows another. Rows are indexed modulo the catalogue, offset from each
+       other so neighbours are never the same sleeve. */
+    const covers = [];
+    (coverSrcs || []).forEach((src) => {
+      const im = new Image();
+      im.decoding = 'async';
+      im.onload = () => { covers.push(im); if (!st.live) draw(); };
+      im.src = src;
+    });
+    const SPEED = [26, -19, 31, -23];   /* px per second per row; sign is direction */
+    const t0 = performance.now();
 
     /* The ink box: the film, the chalk and the floor are all masked to the glyphs, so there
        is no reason to rasterise them across the whole frame. Derived from the same metrics
@@ -1065,40 +1024,38 @@
       ctx.fillRect(box[0], box[1], box[2], box[3]);
       ctx.restore();
 
-      const filmIn = clamp((intro - 0.3) / 0.45);
-      if (filmReady && filmIn > 0) {
+      const wallIn = clamp((intro - 0.3) / 0.45);
+      if (covers.length && wallIn > 0) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(box[0], box[1], box[2], box[3]);
         ctx.clip();
         /* source-atop: only where the destination is already opaque */
         ctx.globalCompositeOperation = 'source-atop';
-        ctx.globalAlpha = filmIn * 0.9;
-        /* The film is a night sea, and it arrives here already graded up to a bright silver
-           texture — see GRADE above for why that happens at the film's own resolution.
-           Cover-fit the frame, with a little pointer drift so the letters read as windows
-           onto something moving behind the page rather than as filled type. */
-        const vw = film.width, vh = film.height;
-        const scale = Math.max(w / vw, h / vh) * 1.16;
-        const dw = vw * scale, dh = vh * scale;
-        const dx = (w - dw) / 2 - st.px * dw * 0.03;
-        const dy = (h - dh) / 2 - st.py * dh * 0.03;
-        ctx.drawImage(film, dx, dy, dw, dh);
-        ctx.restore();
-        /* A floor inside the glyphs. The two lines sample different bands of the film, and
-           MUSIC lands on open water that is genuinely almost black, so without this lift the
-           second line reads several stops darker than the first. */
-        ctx.save();
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.globalAlpha = 0.3 * filmIn;
-        ctx.fillStyle = '#F6F4F1';
-        ctx.fillRect(box[0], box[1], box[2], box[3]);
+        ctx.globalAlpha = wallIn;
+        const tile = Math.max(48, Math.round(st.sizes[0] * 0.7 * 0.5));
+        const rows = Math.ceil(box[3] / tile) + 1;
+        const n = covers.length;
+        const el = reduce.matches ? 0 : (performance.now() - t0) / 1000;
+        const y0 = box[1] - ((box[1]) % tile);
+        for (let r = 0; r < rows; r++) {
+          const y = y0 + r * tile;
+          const ri = Math.round(y / tile);
+          /* the pointer drifts each row a little further than the last: depth in the wall */
+          const shift = el * SPEED[((ri % 4) + 4) % 4] - st.px * tile * (0.35 + 0.15 * (ri & 1));
+          const first = Math.floor((box[0] - shift) / tile) - 1;
+          const last = Math.ceil((box[0] + box[2] - shift) / tile) + 1;
+          for (let c = first; c <= last; c++) {
+            const im = covers[(((c + ri * 5) % n) + n) % n];
+            ctx.drawImage(im, c * tile + shift, y, tile + 0.5, tile + 0.5);
+          }
+        }
         ctx.restore();
       }
 
     }
 
-    /* the canvas only needs a frame loop while the film is playing or the intro is running */
+    /* the canvas only needs a frame loop while the wall is moving or the intro is running */
     /* This draws EVERY frame, deliberately.
        It is tempting to skip frames whose inputs have not changed, and an earlier version of
        this did: a canvas keeps its last painting, so the screen looks the same. But a skip is
@@ -1112,12 +1069,11 @@
     let mraf = 0;
     function loop() {
       mraf = 0;
-      if (!(video && video.requestVideoFrameCallback)) pollFilm();
       draw();
       if (st.live) mraf = requestAnimationFrame(loop);
     }
-    function start() { st.live = true; filmStart(); if (!mraf) mraf = requestAnimationFrame(loop); }
-    function stop() { st.live = false; filmStop(); if (mraf) cancelAnimationFrame(mraf); mraf = 0; }
+    function start() { st.live = true; if (!mraf) mraf = requestAnimationFrame(loop); }
+    function stop() { st.live = false; if (mraf) cancelAnimationFrame(mraf); mraf = 0; }
 
     layout();
     draw();
@@ -1607,11 +1563,9 @@
     paced.forEach((el) => pacer.observe(el));
   }
 
-  /* backgrounded tabs pause video-only autoplay; poke it and fall back to the poster */
-  const film = document.querySelector('.al-hero-video');
-  if (film && !reduce.matches) { film.muted = true; film.play().catch(() => {}); }
-
-  const heroMark = makeMark(document.querySelector('[data-markc]'), film);
+  /* the wordmark is filled with the catalogue's own sleeves: the covers the shop rail shows */
+  const coverSrcs = [...new Set([...document.querySelectorAll('.al-rel-img')].map((i) => i.getAttribute('src')))];
+  const heroMark = makeMark(document.querySelector('[data-markc]'), coverSrcs);
   const lattice = makeLattice(document.querySelector('[data-lattice]'), {
     band: () => heroMark?.band(),
   });
