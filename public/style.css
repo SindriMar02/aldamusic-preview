@@ -1020,16 +1020,10 @@ a { color: inherit; }
 [data-drag='1'] .al-cur i:last-child { transform: scaleX(-1) translateX(-11px); }
 @media (prefers-reduced-motion: reduce) { .al-cur { display: none; } }
 
-/* film: reduced motion gets the poster, no playing video */
-@media (prefers-reduced-motion: reduce) {
-  .al-hero-video { display: none; }
-  .al-hero-film { background: url('img/brand/wave-poster.webp') center / cover no-repeat; }
-}
 
 /* ---------- the wordmark canvas + the opening sequence ---------- */
 /* The film outside the letters is dropped to near black by the canvas itself, so the frame
    only needs a faint bed for the letters to sit in. */
-.al-hero-film { opacity: .16; }
 
 /* Chrome enters after the title sequence resolves. Keyed off a body class rather than
    per-element delays so the intro can be skipped in one place. */
