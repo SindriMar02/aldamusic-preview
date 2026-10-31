@@ -4,7 +4,6 @@
    after i, þ æ ö at the end), not by Unicode code point, which put Elín after Elvar.
    w/h are the asset's true pixels; nothing is ever rendered larger. */
 export const ARTISTS = [
-  { name: "Alaska1867", slug: "alaska1867", w: 1800, h: 1800 },
   { name: "Baggalútur", slug: "baggalutur", w: 1800, h: 1200 },
   { name: "Birgir Hákon", slug: "birgir-hakon", w: 1400, h: 1400 },
   { name: "Birnir", slug: "birnir", w: 1800, h: 1800 },

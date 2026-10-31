@@ -6,7 +6,7 @@ export const META = {
   title: 'Alda Music · íslensk tónlist frá 1975',
   description:
     'Alda Music gefur út og heldur til haga stórum hluta þess sem hefur verið hljóðritað á Íslandi. '
-    + '54 listamenn, plötubúð á Eyjarslóð 7 og netverslun.',
+    + '53 listamenn, plötubúð á Eyjarslóð 7 og netverslun.',
   address: 'Eyjarslóð 7, 101 Reykjavík',
   email: 'alda@aldamusic.is',
   phone: '+354 546 2202',
@@ -64,9 +64,9 @@ export const SHOP = {
 export const ROSTER = {
   eyebrow: 'Listafólkið',
   title: 'Listafólk',
-  lead: 'Fimmtíu og fjórir listamenn eru á skrá hjá Öldu. Skrunaðu niður listann.',
+  lead: 'Fimmtíu og þrír listamenn eru á skrá hjá Öldu. Skrunaðu niður listann.',
   hint: 'Nafnið í miðjunni er valið',
-  countLabel: 'af 54',
+  countLabel: 'af 53',
 };
 
 export const HISTORY = {
@@ -113,7 +113,7 @@ export const HISTORY = {
       head: 'Eyjarslóð 7',
       tag: 'Reykjavík 101',
       body:
-        'Fimmtíu og fjórir listamenn á skrá, plötubúð opin sex daga vikunnar og netverslun '
+        'Fimmtíu og þrír listamenn á skrá, plötubúð opin sex daga vikunnar og netverslun '
         + 'sem sendir hvert sem er. Sama katalógur, fimmtíu árum síðar.',
     },
   ],
