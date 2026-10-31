@@ -1051,6 +1051,15 @@
           }
         }
         ctx.restore();
+        /* A floor inside the glyphs. Several sleeves are near black, and a black tile on the
+           black page erases the letter under it, so the first A and the M read as holes. A
+           light chalk lift keeps every tile above the page ground; the colours stay colours. */
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = 0.3 * wallIn;
+        ctx.fillStyle = '#F6F4F1';
+        ctx.fillRect(box[0], box[1], box[2], box[3]);
+        ctx.restore();
       }
 
     }
