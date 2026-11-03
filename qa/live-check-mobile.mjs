@@ -1,0 +1,16 @@
+import puppeteer from 'puppeteer-core';
+const b = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, userDataDir: '/private/tmp/claude-501/alda-live-check-m', args: ['--hide-scrollbars'] });
+const p = await b.newPage();
+await p.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+const errs = [], bad = [];
+p.on('pageerror', (e) => errs.push(String(e)));
+p.on('response', (r) => { if (r.status() >= 400) bad.push(r.status() + ' ' + r.url()); });
+const t0 = Date.now();
+await p.goto('https://sindrimar02.github.io/aldamusic-preview/?c=' + Date.now(), { waitUntil: 'load' });
+await p.waitForFunction(() => !document.body.classList.contains('al-loading') && !document.body.classList.contains('al-intro'), { timeout: 20000 });
+const ready = Date.now() - t0;
+await new Promise((r) => setTimeout(r, 800));
+await p.screenshot({ path: '/private/tmp/claude-501/alda-live-mobile.png' });
+const m = await p.evaluate(() => ({ hscroll: document.documentElement.scrollWidth > innerWidth }));
+console.log(JSON.stringify({ readyMs: ready, ...m, errs, bad }));
+await b.close();
