@@ -507,9 +507,16 @@ a { color: inherit; }
   position: absolute; top: 50%; left: 50%;
   width: 100%; aspect-ratio: 1;
   transform: translate(-50%, -50%) translateX(0) rotate(0deg);
+  /* A record that is not being looked at does not exist: no box, no paint, no layer.
+     app.js sets data-disc on the card at pointer enter and data-out one frame later, so the
+     spring still has a resting position to leave from. */
+  display: none;
   transition: transform 0.83s linear(0.0, 0.0236, 0.0827, 0.1635, 0.2552, 0.3504, 0.4437, 0.5316, 0.6119, 0.6836, 0.7462, 0.7998, 0.8451, 0.8826, 0.9133, 0.9379, 0.9574, 0.9724, 0.9839, 0.9923, 0.9984, 1.0026, 1.0054, 1.007, 1.0078, 1.0079, 1.0077, 1.0072, 1.0066, 1.0058, 1.0051, 1.0043, 1);
   z-index: 0;
 }
+[data-disc] .al-rel-disc { display: block; }
+[data-out] .al-rel-disc { transform: translate(-50%, -50%) translateX(48.6%) rotate(180deg); }
+[data-out] .al-rel-disc-i { animation-play-state: running; }
 .al-rel-disc-i {
   position: absolute; inset: 0; border-radius: 50%;
   border: 1px solid #262626;
@@ -533,11 +540,7 @@ a { color: inherit; }
   background: #0f0f0f;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.5);
 }
-.al-rel-link:hover .al-rel-disc,
-.al-rel-link:focus-visible .al-rel-disc { transform: translate(-50%, -50%) translateX(48.6%) rotate(180deg); }
 .al-rel:hover { z-index: 3; }
-.al-rel-link:hover .al-rel-disc-i,
-.al-rel-link:focus-visible .al-rel-disc-i { animation-play-state: running; }
 .al-rel-link:hover .al-rel-img,
 .al-rel-link:focus-visible .al-rel-img { transform: translate3d(-7%, 0, 0) rotate(-4deg) scale(.98); filter: saturate(1.04); }
 @keyframes al-spin { to { transform: rotate(360deg); } }
@@ -1138,10 +1141,6 @@ a { color: inherit; }
 }
 .al-odo-i[data-on='1'] { color: var(--red-deep); }
 
-/* the vinyl rotates with the section's own pass through the viewport */
-.al-rel-disc-i { animation: none; transform: rotate(var(--al-spin, 0deg)); }
-.al-rel-link:hover .al-rel-disc-i,
-.al-rel-link:focus-visible .al-rel-disc-i { animation: none; }
 
 /* Phones reveal by the LINE, not by the letter.
    The per-character stagger is the effect on a wide screen, but its cost is one independently

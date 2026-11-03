@@ -1454,7 +1454,7 @@
     }
     grid.appendChild(frag);
     /* the delay carries the sweep: reveal order, not per-cell timers */
-    const SWEEP = 1000;
+    const SWEEP = 600;
     order.forEach((cellIndex, k) => {
       cells[cellIndex].style.setProperty('--d', `${((k / total) * SWEEP).toFixed(0)}ms`);
     });
@@ -1465,7 +1465,7 @@
       cells.forEach((c) => c.setAttribute('data-off', '1'));
       const t0 = performance.now();
       const tick = (now) => {
-        const p = clamp((now - t0) / (SWEEP + 320));
+        const p = clamp((now - t0) / (SWEEP + 120));
         bar?.style.setProperty('--p', p.toFixed(3));
         if (p < 1) requestAnimationFrame(tick);
         else fly();
@@ -1491,10 +1491,10 @@
          it is carried through the scale unchanged */
       const ox = from.left - lock.getBoundingClientRect().left;
       const oy = from.top - lock.getBoundingClientRect().top;
-      lock.style.transition = 'transform .82s cubic-bezier(.7,0,.2,1)';
+      lock.style.transition = 'transform .6s cubic-bezier(.7,0,.2,1)';
       lock.style.transform = `translate(${(to.left - from.left + ox * (1 - k)).toFixed(2)}px,`
         + `${(to.top - from.top + oy * (1 - k)).toFixed(2)}px) scale(${k.toFixed(4)})`;
-      setTimeout(land, 700);
+      setTimeout(land, 520);
     }
 
     function land() {
@@ -1511,7 +1511,7 @@
      inside the letters, then the frame and the chrome arrive. Skippable on any input, and
      under prefers-reduced-motion it never runs at all. */
   function runIntro(mark) {
-    const DUR = 1900;
+    const DUR = 1300;
     let done = false;
     const finish = () => {
       if (done) return;
@@ -1591,6 +1591,35 @@
     }, { passive: true });
     hero.addEventListener('pointerleave', () => { heroMark.pointer(0, 0); lattice?.leave(); });
   }
+
+
+  /* The vinyl on a release card exists only while the card is hot. Thirty-two always-present
+     gradient discs cost the shop rail most of its frame budget; one disc at a time costs
+     nothing. Enter -> data-disc (the disc is laid out at rest), a frame later -> data-out (the
+     spring leaves); leave -> data-out off, and data-disc is dropped once the spring has
+     settled. Keyboard focus is handled the same way. */
+  (function discOnDemand() {
+    const rail = document.querySelector('[data-rail]');
+    if (!rail) return;
+    const timers = new WeakMap();
+    const on = (card) => {
+      clearTimeout(timers.get(card));
+      if (!card.hasAttribute('data-disc')) {
+        card.setAttribute('data-disc', '');
+        void card.offsetWidth;
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => card.setAttribute('data-out', '')));
+    };
+    const off = (card) => {
+      card.removeAttribute('data-out');
+      timers.set(card, setTimeout(() => card.removeAttribute('data-disc'), 950));
+    };
+    const cardOf = (e) => e.target.closest && e.target.closest('.al-rel');
+    rail.addEventListener('pointerover', (e) => { const c = cardOf(e); if (c && !c.contains(e.relatedTarget)) on(c); });
+    rail.addEventListener('pointerout', (e) => { const c = cardOf(e); if (c && !c.contains(e.relatedTarget)) off(c); });
+    rail.addEventListener('focusin', (e) => { const c = cardOf(e); if (c) on(c); });
+    rail.addEventListener('focusout', (e) => { const c = cardOf(e); if (c && !c.contains(e.relatedTarget)) off(c); });
+  })();
 
   const odo = makeOdometer(document.querySelector('[data-odo]'));
   const rail = makeRail(document.querySelector('[data-rail]'), {
@@ -1750,12 +1779,9 @@
         if (pass !== shopBox.cardp) { shopBox.cardp = pass; shopEl.style.setProperty('--al-cardp', pass.toFixed(4)); }
       }
 
-      /* 4. scrubbed travel and rotation over each element's full pass through the
-         viewport (their "top bottom" → "bottom top" window) */
-      if (shopBox) {
-        const spin = Math.round(clamp((y + vh - shopBox.top) / (shopBox.h + vh)) * 660 * 100) / 100;
-        if (spin !== shopBox.spin) { shopBox.spin = spin; shopEl.style.setProperty('--al-spin', `${spin.toFixed(2)}deg`); }
-      }
+      /* The vinyl no longer turns with the scroll: --al-spin was written on .al-shop every
+         frame and inherited by every node under it, to rotate thirty-two records nobody could
+         see. A record now only exists while it is hovered, and it turns on its own clock. */
 
 
       if (rollBox) {
